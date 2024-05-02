@@ -89,5 +89,51 @@ Bot API
 As mensagens captadas por um *bot* podem ser acessadas via API. A única informação necessária é o `token` de acesso fornecido pelo `BotFather` na criação do *bot*.
 Nota: A documentação completa da API pode ser encontrada neste [link](https://core.telegram.org/bots/api)
 
-`Nota` = Processo feito no arquivo bot_api
+`Nota` = Processo feito no arquivo bot_api.ipynb
+
+## Dados
+Antes de avançar para etapa analítica, vamos trabalhar na manipulação dos dados de mensagens do Telegram.
+
+### **Mensagem** 
+Uma mensagem recuperada via API é um dado semi-estruturado no formato JSON com algumas chaves mandatórias e diversas chaves opcionais, estas últimas presentes (ou não) dependendo do tipo da mensagem. Por exemplo, mensagens de texto apresentam a chave `text` enquanto mensagens de áudio apresentam a chave `audio`. Neste projeto vamos focar em mensagens do tipo texto, ou seja, vamos ingerir as chaves mandatórias e a chave `text`.
+
+> **Nota**: A lista completa das chaves disponíveis pode ser encontrada na documentação neste [link](https://core.telegram.org/bots/api#message).
+ - Exemplo:
+   %%writefile telegram.json
+{
+    "update_id": 123,
+    "message": {
+        "message_id": 1,
+        "from": {
+            "id": 321,
+            "is_bot": false,
+            "first_name": "Andre"
+        },
+        "chat": {
+            "id": -789,
+            "type": "group"
+        },
+        "date": 1640995200,
+        "text": "Ola, mundo!"
+    }
+}
+
+- Descrição:
+| chave | tipo valor | opcional | descrição |
+| -- | -- | -- | -- |
+| updated_id | int | não | id da mensagem enviada ao **bot** |
+| message_id | int | não | id da mensagem enviada ao grupo |
+| from_id | int | sim | id do usuário que enviou a mensagem |
+| from_is_bot | bool | sim | se o usuário que enviou a mensagem é um **bot** |
+| from_first_name | str | sim | primeiro nome do usário que enviou a mensagem |
+| chat_id | int | não | id do *chat* em que a mensagem foi enviada |
+| chat_type | str | não | tipo do *chat*: private, group, supergroup ou channel |
+| date | int | não | data de envio da mensagem no formato unix |
+| text | str | sim | texto da mensagem |
+
+
+### **Wrangling** 
+Vamos denormalizar o conteúdo da mensagem semi-estruturado no formato JSON utilizando apenas Python nativo, ou seja, sem o auxílio de pacotes, como Pandas.
+Agora vou utilizar um laço de repetição para varrer todas as chaves do arquivo e selecionar apenas as de interesse. Caso a mensagem não possua a chave text, ela será criada com o valor igual a None. Além disso, vamos adicionar duas chaves de tempo para indicar o momento em que o dado foi processado: context_date e context_timestamp.
+Por fim, vou utilizar o pacote Python PyArrow para criar uma tabela com os dados processado que, posteriormente, pode ser facilmente persistida em um arquivo no formato Apache Parquet.
 

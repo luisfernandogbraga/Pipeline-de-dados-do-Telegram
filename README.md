@@ -191,14 +191,6 @@ Na etapa de **ingestão**, o `AWS Lambda` tem a função de ativamente persistir
 Função lambda
 OBS: codigo no arquivo lambda.ipynb
 
-VARIAVEIS DE AMBIENTE
-
-![5](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/d01f1939-0e58-4425-8541-eda40b99a061)
-
-PERMISSÕES
-
-![6](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/b911a300-e089-4794-a54c-8f930b4dd478)
-
 TESTE
 
 ![4](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/da0239db-c003-43a2-909d-5b0c78d92b0e)
@@ -207,8 +199,84 @@ CODIGO
 
 ![3](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/4586f6a0-639f-49d0-82ac-25a137e6bc50)
 
+VARIAVEIS DE AMBIENTE
+
+Note que o código exige a configuração de duas variáveis de ambiente: `AWS_S3_BUCKET` com o nome do *bucket* do `AWS S3` e `TELEGRAM_CHAT_ID` com o id do *chat* do grupo do **Telegram**. Para adicionar variáveis de ambiente em uma função do `AWS Lambda`, basta acessar configurações -> variáveis de ambiente no console da função.
+
+> **Nota**: Variáveis de ambiente são excelentes formas de armazenar informações sensíveis.
+
+![5](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/d01f1939-0e58-4425-8541-eda40b99a061)
+
+PERMISSÕES
+
+Por fim, precisamos adicionar a permissão de escrita no *bucket* do `AWS S3` para a função do `AWS Lambda` no `AWS IAM`.
+### **AWS API Gateway**
+
+Na etapa de **ingestão**, o `AWS API Gateway` tem a função de receber as mensagens captadas pelo *bot* do **Telegram**, enviadas via *webhook*, e iniciar uma função do `AWS Lambda`, passando o conteúdo da mensagem no seu parâmetro *event*. Para tanto vamos criar uma API e configurá-la como gatilho da função do `AWS Lambda`:
+
+- Acesse o serviço e selecione: *Create API* -> *REST API*;
+- Insira um nome;
+- Selecione: *Actions* -> *Create Method* -> *POST*;
+![7](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/9f12835d-0fdc-4400-8377-d09eebc89839)
+
+- Na tela de *setup*: 
+- Selecione *Integration type* igual a *Lambda Function*;
+- Habilite o *Use Lambda Proxy integration*;
+- Busque pelo nome a função do `AWS Lambda`.
+
+Podemos testar a integração com o `AWS Lambda` através da ferramenta de testes do serviço. Por fim, vamos fazer a implantação da API e obter o seu endereço *web*.
+- Selecione: *Actions* -> *Deploy API*;
+- Selecione: *New Stage* para *Deployment stage*;
+- Adicione *dev* como `Stage name`.
+
+![6](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/b911a300-e089-4794-a54c-8f930b4dd478)
+
+Copie o a `url` gerada na variável `aws_api_gateway_url`.
+
+from getpass import getpass
+aws_api_gateway_url = getpass()
+
+### **. Telegram**
+
+Vamos configurar o *webhook* para redirecionar as mensagens para a `url` do `AWS API Gateway`.
+
+ - **setWebhook**
+O método `setWebhook` configura o redirecionamento das mensagens captadas pelo *bot* para o endereço *web* do paramametro `url`.
+
+> **Nota**: os métodos `getUpdates` e `setWebhook` são mutualmente exclusivos, ou seja, enquanto o *webhook* estiver ativo, o método `getUpdates` não funcionará. Para desativar o *webhook*, basta utilizar o método `deleteWebhook`.
+
+response = requests.get(url=f'{base_url}/setWebhook?url={aws_api_gateway_url}')
+print(json.dumps(json.loads(response.text), indent=2))
+
+![8](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/bbb2d32f-fb07-4da6-a958-83e246f94c4b)
 
 
+## 2\. ETL
 
+A etapa de **extração, transformação e carregamento** (do inglês *extraction, transformation and load* ou **ETL**) é uma etapa abrangente responsável pela manipulação dos dados ingeridos de sistemas transacionais, ou seja, já persistidos em camadas cruas ou *raw* de sistemas analíticos. Os processos conduzidos nesta etapa variam bastante de acordo com a área da empresa, do volume/variedade/velocidade do dado consumido, etc. Contudo, em geral, o dado cru ingerido passa por um processo recorrente de *data wrangling* onde o dado é limpo, deduplicado, etc. e persistido com técnicas de particionamento, orientação a coluna e compressão. Por fim, o dado processado está pronto para ser analisado por profissionais de dados.
+
+No projeto, as mensagens de um único dia, persistidas na camada cru, serão compactas em um único arquivo, orientado a coluna e comprimido, que será persistido em uma camada enriquecida. Além disso, durante este processo, o dado também passará por etapas de *data wrangling*.
+
+### **. AWS S3** 
+Na etapa de **ETL**, o `AWS S3` tem a função de passivamente armazenar as mensagens processadas de um dia em um único arquivo no formato Parquet. Para tanto, basta a criação de um *bucket*. Como padrão, vamos adicionar o sufixo `-enriched` ao seu nome (vamos seguir esse padrão para todos os serviços desta camada).
+
+> **Nota**: um `data lake` é o nome dado a um repositório de um grande volume dados. É organizado em zonas que armazenam replicadas dos dados em diferentes níveis de processamento. A nomenclatura das zonas varia, contudo, as mais comuns são: *raw* e *enriched* ou *bronze*, *silver* e *gold*.
+
+### **. AWS Lambda** 
+
+Na etapa de **ETL**, o `AWS Lambda` tem a função de ativamente processar as mensagens captadas pelo *bot* do **Telegram**, persistidas na camada cru no *bucket* do `AWS S3`, e persisti-las na camada enriquecida, também em um *bucket* do `AWS S3`. Logo, vamos criar uma função que opera da seguinte forma:
+
+- Lista todos os arquivos JSON de uma única participação da camada crua de um *bucket* do `AWS S3`;
+- Para cada arquivo listado:
+- Faz o *download* do arquivo e carrega o conteúdo da mensagem;
+- Executa uma função de *data wrangling*;
+- Cria uma tabela do PyArrow e a contatena com as demais.
+- Persiste a tabela no formato Parquet na camada enriquecida em um *bucket* do `AWS S3`.
+
+> **Nota**: O fato de utilizarmos duas camadas de armazenamento e processamento, permite que possamos reprocessar os dados crus de diversas maneiras, quantas vezes forem preciso.
+
+> **Nota**: Atente-se ao fato de que a função processa as mensagens do dia anterior (D-1).
+
+OBS: arqueivo com o codigo enriched.ipynb
 
 

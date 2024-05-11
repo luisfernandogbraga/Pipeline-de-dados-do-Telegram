@@ -1,33 +1,27 @@
 # Pipeline de dados do Telegram
 ![000_1433zq-654x450](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/166cdb89-e429-4b40-8316-d4475c19f982)
 
-# Apresentação e desenvolvimento do projeto de Pipeline de dados do Telegram, desde sua criação até automação com bot no Telegram e coleta/tratativa de dados
-Vou construir um Pipeline completo de Dados, ou seja vou construir uma solução na AWS que permitar automatizar automaticamente: extrair, manipular, armazenar e processar um grande volume de dados. Isso permitirá que seja gerado diáriamente insghts novos sobre esse tipo de informação. Portamdo estarei dividindo o projeto em dois: insfraestrutura e extrair / estoritelin na nuvem.
+Este é um projeto de pipeline de dados para coletar mensagens de um determinado grupo do Telegram e realizar análises usando ferramentas da AWS.
 
-# Contexto
-Um chatbot é um tipo de software que interage com usuários através de conversas automatizadas em plataformas de mensagens. Uma aplicação comum de chatbots é o seu uso no atendimento ao cliente, onde, de maneira geral, ajudam clientes a resolver problemas ou esclarecer dúvidas recorrentes antes mesmo que um atendente humano seja acionado.
+Objetivo
+O objetivo deste projeto é criar um pipeline de dados que permita coletar mensagens de um grupo do Telegram, armazená-las em um local seguro na AWS, realizar transformações e análises utilizando SQL ou Python e, finalmente, apresentar os resultados de forma acessível.
 
-Telegram é uma plataforma de mensagens instantâneas freeware (distribuído gratuitamente) e, em sua maioria, open source. É muito popular entre desenvolvedores por ser pioneiro na implantação da funcionalidade de criação de chatbots, que, por sua vez, permitem a criação de diversas automações.
+Etapas do Projeto
+1. Criação do Grupo no Telegram
+Antes de começar, é necessário criar um grupo no Telegram do qual você deseja coletar as mensagens. Certifique-se de que o bot que será utilizado para coletar as mensagens tenha acesso a esse grupo.
 
-# Arquitetura
+2. Configuração na AWS
+Ingestão de Dados
+- API Gateway: Configurar um ponto de extremidade na API Gateway para receber as mensagens do Telegram.
+- Lambda: Criar uma função Lambda para processar as mensagens recebidas pela API Gateway.
+- S3: Armazenar as mensagens processadas em um bucket do S3.
 
-Uma atividade analítica de interesse é a de realizar a análise exploratória de dados enviadas a um chatbot para responder perguntas como:
+ETL (Extract, Transform, Load)
+- Event Bridge: Configurar regras no Event Bridge para acionar a função Lambda de processamento sempre que novas mensagens forem recebidas.
+- Lambda: Implementar a lógica de transformação das mensagens, se necessário, e carregar os dados transformados no S3.
 
-1. Qual o horário que os usuários mais acionam o bot?
-2. Qual o problema ou dúvida mais frequente?
-3. O bot está conseguindo resolver os problemas ou esclarecer as dúvidas?
-4. Etc.
-
-Portanto, vamos construir um Pipeline de Dados que ingira, processe, armazene e exponha mensagens de um grupo do Telegram para que profissionais de dados possam realizar análises. A arquitetura proposta é dividida em duas: transacional, no Telegram, onde os dados são produzidos, e analítica, na Amazon Web Services (AWS), onde os dados são analisados.
-
-
-Telegram . O Telegram representa a fonte de dados transacionais. Mensagens enviadas por usuários em um grupo são capturadas por um bot e redirecionadas via webhook do backend do aplicativo para um endpoint (endereço web que aceita requisições HTTP) exposto pelo AWS API Gateway. As mensagens trafegam no corpo ou payload da requisição.
-
-AWS | Ingestão . Uma requisição HTTP com o conteúdo da mensagem em seu payload é recebia pelo AWS API Gateway que, por sua vez, as redireciona para o AWS Lambda, servindo assim como seu gatilho. Já o AWS Lambda recebe o payload da requisição em seu parâmetro event, salva o conteúdo em um arquivo no formato JSON (original, mesmo que o payload) e o armazena no AWS S3 particionado por dia.
-
-AWS | ETL . Uma vez ao dia, o AWS Event Bridge aciona o AWS Lambda que processa todas as mensagens do dia anterior (atraso de um dia ou D-1), denormaliza o dado semi-estruturado típico de arquivos no formato JSON, salva o conteúdo processado em um arquivo no formato Apache Parquet e o armazena no AWS S3 particionado por dia.
-
-AWS | Apresentação . Por fim, uma tabela do AWS Athena é apontada para o bucket do AWS S3 que armazena o dado processado: denormalizado, particionado e orientado a coluna. Profissionais de dados podem então executar consultas analíticas (agregações, ordenações, etc.) na tabela utilizando o SQL para a extração de insights.
+3. Apresentação dos Dados
+- Athena: Utilizar o Athena para executar consultas SQL sobre os dados armazenados no S3 e obter insights a partir das análises realizadas.
 
 ![Profissao Analista de dados M42 Material de apoio arch](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/5552f083-ade9-4b4b-ac56-8a2366747cbb)
 
@@ -131,9 +125,90 @@ Uma mensagem recuperada via API é um dado semi-estruturado no formato JSON com 
 | date | int | não | data de envio da mensagem no formato unix |
 | text | str | sim | texto da mensagem |
 
+## . Contexto
 
-### **Wrangling** 
-Vamos denormalizar o conteúdo da mensagem semi-estruturado no formato JSON utilizando apenas Python nativo, ou seja, sem o auxílio de pacotes, como Pandas.
-Agora vou utilizar um laço de repetição para varrer todas as chaves do arquivo e selecionar apenas as de interesse. Caso a mensagem não possua a chave text, ela será criada com o valor igual a None. Além disso, vamos adicionar duas chaves de tempo para indicar o momento em que o dado foi processado: context_date e context_timestamp.
-Por fim, vou utilizar o pacote Python PyArrow para criar uma tabela com os dados processado que, posteriormente, pode ser facilmente persistida em um arquivo no formato Apache Parquet.
+- **Arquitetura**
+
+**Telegram**
+As mensagens captadas por um *bot* podem ser acessadas via API. A única informação necessária é o `token` de acesso fornecido pelo `BotFather` na criação do *bot*.
+> **Nota:** A documentação completa da API pode ser encontrada neste [link](https://core.telegram.org/bots/api)
+
+Insira o token aqui:
+from getpass import getpass
+token = getpass()
+
+A `url` base é comum a todos os métodos da API.
+import json
+base_url = f'https://api.telegram.org/bot{token}'
+
+- **getMe**
+O método `getMe` retorna informações sobre o *bot*.
+import requests
+response = requests.get(url=f'{base_url}/getMe')
+print(json.dumps(json.loads(response.text), indent=2))
+
+- **getUpdates**
+O método `getMe` retorna as mensagens captadas pelo *bot*.
+response = requests.get(url=f'{base_url}/getUpdates')
+print(json.dumps(json.loads(response.text), indent=2))
+
+![Captura de tela 2024-05-10 191828](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/24cdc6c9-764c-46cd-8b28-580df15d405d)
+
+OBS: Nunca disponibilize o id do chat.
+
+## . Ingestão
+O dado ingerido é persistido no formato mais próximo do original, ou seja, nenhuma transformação é realizada em seu conteúdo ou estrutura (*schema*). Como exemplo, dados de uma API *web* que segue o formato REST (*representational state transfer*) são entregues, logo, persistidos, no formato JSON.
+
+No projeto, as mensagens capturadas pelo *bot* podem ser ingeridas através da API *web* de *bots* do **Telegram**, portanto são fornecidos no formato JSON. Como o **Telegram** retem mensagens por apenas 24h em seus servidores, a ingestão via **streaming** é a mais indicada. Para que seja possível esse tipo de **ingestão** seja possível, vamos utilizar um *webhook* (gancho *web*), ou seja, vamos redirecionar as mensagens automaticamente para outra API *web*.
+
+Sendo assim, precisamos de um serviço da AWS que forneça um API *web* para receber os dados redirecionados, o `AWS API Gateway` (documentação neste [link](https://docs.aws.amazon.com/pt_br/apigateway/latest/developerguide/welcome.html)). Dentre suas diversas funcionalidades, o `AWS API Gateway` permite o redirecionamento do dado recebido para outros serviços da AWS. Logo, vamos conecta-lo ao `AWS Lambda`, que pode sua vez, irá armazenar o dado em seu formato original (JSON) em um *bucket* do `AWS S3`.
+
+> Sistemas que reagem a eventos são conhecidos como *event-driven*.
+
+Portanto, precisamos:
+ - Criar um *bucket* no `AWS S3`;
+ - Criar uma função no `AWS Lambda`;
+ - Criar uma API *web* no `AWS API Gateway`;
+ - Configurar o *webhook* da API de *bots* do **Telegram**.
+
+### **. AWS S3**
+Na etapa de **ingestão**, o `AWS S3` tem a função de passivamente armazenar as mensagens captadas pelo *bot* do **Telegram** no seu formato original: JSON. Para tanto, basta a criação de um *bucket*. Como padrão, vamos adicionar o sufixo `-raw` ao seu nome (vamos seguir esse padrão para todos os serviços desta camada).
+
+> **Nota**: um `data lake` é o nome dado a um repositório de um grande volume dados. É organizado em zonas que armazenam replicadas dos dados em diferentes níveis de processamento. A nomenclatura das zonas varia, contudo, as mais comuns são: *raw* e *enriched* ou *bronze*, *silver* e *gold*.
+
+Bucket criado
+![2](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/4cd873cd-253f-4ca9-b11c-a35ade85d856)
+
+### **. AWS Lambda**
+Na etapa de **ingestão**, o `AWS Lambda` tem a função de ativamente persistir as mensagens captadas pelo *bot* do **Telegram** em um *bucket* do `AWS S3`. Para tanto vamos criar uma função que opera da seguinte forma:
+- Recebe a mensagem no parâmetro `event`;
+ - Verifica se a mensagem tem origem no grupo do **Telegram** correto;
+ - Persiste a mensagem no formato JSON no *bucket* do `AWS S3`;
+ - Retorna uma mensagem de sucesso (código de retorno HTTP igual a 200) a API de *bots* do **Telegram**.
+ - 
+> **Nota**: No **Telegram**, restringimos a opção de adicionar o *bot* a grupos, contudo, ainda é possível iniciar uma conversa em um *chat* privado.
+
+Função lambda
+OBS: codigo no arquivo lambda.ipynb
+
+VARIAVEIS DE AMBIENTE
+
+![5](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/d01f1939-0e58-4425-8541-eda40b99a061)
+
+PERMISSÕES
+
+![6](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/b911a300-e089-4794-a54c-8f930b4dd478)
+
+TESTE
+
+![4](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/da0239db-c003-43a2-909d-5b0c78d92b0e)
+
+CODIGO
+
+![3](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/4586f6a0-639f-49d0-82ac-25a137e6bc50)
+
+
+
+
+
 

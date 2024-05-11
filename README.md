@@ -279,4 +279,41 @@ Na etapa de **ETL**, o `AWS Lambda` tem a função de ativamente processar as me
 
 OBS: arqueivo com o codigo enriched.ipynb
 
+### **. AWS Event Bridge** 
+Na etapa de **ETL**, o `AWS Event Bridge` tem a função de ativar diariamente a função de **ETL** do `AWS Lambda`, funcionando assim como um *scheduler*.
+> **Nota**: Atente-se ao fato de que a função processa as mensagens do dia anterior (D-1).
+
+## . Apresentação
+A etapa de **apresentação** é reponsável por entregar o dado para os usuários (analistas, cientistas, etc.) e sistemas (dashboards, motores de consultas, etc.), idealmente através de uma interface de fácil uso, como o SQL, logo, essa é a única etapa que a maioria dos usuários terá acesso. Além disso, é importante que as ferramentas da etapa entregem dados armazenados em camadas refinadas, pois assim as consultas são mais baratas e o dados mais consistentes.
+
+### **. AWS Athena** 
+Na etapa de **apresentação**, o `AWS Athena` tem função de entregar o dados através de uma interface SQL para os usuários do sistema analítico. Para criar a interface, basta criar uma tabela externa sobre o dado armazenado na camada mais refinada da arquitetura, a camada enriquecida.
+
+```sql
+CREATE EXTERNAL TABLE `telegram`(
+  `message_id` bigint, 
+  `user_id` bigint, 
+  `user_is_bot` boolean, 
+  `user_first_name` string, 
+  `chat_id` bigint, 
+  `chat_type` string, 
+  `text` string, 
+  `date` bigint)
+PARTITIONED BY ( 
+  `context_date` date)
+ROW FORMAT SERDE 
+  'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe' 
+STORED AS INPUTFORMAT 
+  'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat' 
+OUTPUTFORMAT 
+  'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat'
+LOCATION
+  's3://<bucket-enriquecido>/'
+```
+Por fim, adicione as partições disponíveis.
+
+> **Importante**: Toda vez que uma nova partição é adicionada ao repositório de dados, é necessário informar o `AWS Athena` para que a ela esteja disponível via SQL. Para isso, use o comando SQL `MSCK REPAIR TABLE <nome-tabela>` para todas as partições (mais caro) ou `ALTER TABLE <nome-tabela> ADD PARTITION <coluna-partição> = <valor-partição>` para uma única partição (mais barato), documentação neste [link](https://docs.aws.amazon.com/athena/latest/ug/alter-table-add-partition.html)).
+
+
+
 

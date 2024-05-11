@@ -314,6 +314,18 @@ Por fim, adicione as partições disponíveis.
 
 > **Importante**: Toda vez que uma nova partição é adicionada ao repositório de dados, é necessário informar o `AWS Athena` para que a ela esteja disponível via SQL. Para isso, use o comando SQL `MSCK REPAIR TABLE <nome-tabela>` para todas as partições (mais caro) ou `ALTER TABLE <nome-tabela> ADD PARTITION <coluna-partição> = <valor-partição>` para uma única partição (mais barato), documentação neste [link](https://docs.aws.amazon.com/athena/latest/ug/alter-table-add-partition.html)).
 
+10 primeiras linhas para observar os dados.
+![Captura de tela 2024-05-10 234454](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/564f02b9-3a6a-4404-a80c-96cf71be221a)
 
+- Quantidade de mensagens por dia.
+![Captura de tela 2024-05-10 234707](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/315ef6b3-2c7b-4151-8924-def2919d79d2)
 
+- Quantidade de mensagens por usuário por dia.
+![Captura de tela 2024-05-10 234812](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/f8342fcf-2d18-42fd-95a8-4b620544c3bd)
+
+- Média do tamanho das mensagens por usuário por dia.
+![Captura de tela 2024-05-10 235003](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/20a43134-2a58-4e73-bdc6-2b174782fdfe)
+
+- Quantidade de mensagens por hora por dia da semana por número da semana.
+![Captura de tela 2024-05-10 235126](https://github.com/luisfernandogbraga/Pipeline-de-dados-do-Telegram/assets/134460985/fbbaac5a-01fa-45b3-974f-3970df9e0ac6)
 
